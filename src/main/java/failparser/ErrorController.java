@@ -1,6 +1,7 @@
 package failparser;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,9 +32,9 @@ import breeze.optimize.flow.LPMaxFlow;
 
 public class ErrorController {
 	static final boolean train = true;
-	static boolean doANOVA = true;
+	static boolean doANOVA = false;
 	static boolean doClassification = true;
-	//static String dir = "/Users/cdarmetk/columbia/ASE/project/dataset_sm"
+	//static String dir = "/Users/cdarmetk/columbia/ASE/project/dataset_lg"
 	
 	public static void main(String[] args) {
 		
@@ -57,8 +58,12 @@ public class ErrorController {
 		
 		//FileUtils.toFile(new URL(dir))
 		
-		File dir = new File(dirPath);
-		int author_count = dir.list().length;
+		File dir = new File(dirPath);		
+		int author_count  = dir.listFiles(new FileFilter() {
+		    public boolean accept(File f) {
+		        return f.isDirectory();
+		    }
+		}).length;
 		
 		Collection<File> filescol = FileUtils.listFiles(dir,
                 FileFilterUtils.suffixFileFilter(".java"), TrueFileFilter.INSTANCE);
@@ -79,7 +84,7 @@ public class ErrorController {
 							e.printStackTrace();
 						}
 					}
-					res.calcFeatureVector();
+					res.calcFeatureMap();
 				}
 				return res;
 			}
@@ -87,19 +92,24 @@ public class ErrorController {
 		
 		List<AuthorProfile> profList = res.collect();
 
-		
+		System.out.println("before ANOVA start");
 		//run training/classification
 		if (doANOVA){
 			//for each category
-			String[] categories = {"try_count", "if_count", "extype_count"};
+			String[] categories = {"try_count", "if_count", "error_loc_ratio",
+								   "avg_catches", "avg_size", "exception_types", "throw_count_ratio",
+								   "method_throw_ratio", "finally_ratio","rethrow_ratio", "return_ratio",
+								   "print_msg_ratio", "print_stack_ratio", "exit_ratio", "no_handle_ratio",
+								   "catch_comment_avg"};
 			for (String cat : categories){
+				System.out.println("ANOVA " + cat);
 				//create a new map, with author -> double array
 				Map<Integer,List<Double>> data = new HashMap<Integer,List<Double>>();
 				for (AuthorProfile ap : profList){
 					if (!data.containsKey(ap.author)){
 						data.put(ap.author, new ArrayList<Double>());
 					}
-					data.get(ap.author).add(ap.featureVector.get(cat));
+					data.get(ap.author).add(ap.featureMap.get(cat));
 				}
 
 				//convert to collection of double[]
@@ -118,10 +128,12 @@ public class ErrorController {
 				System.out.println("PVal for " + cat + ": " + pval);
 			}
 		}
+		System.out.println(1.0/0);
 		if (doClassification){
+			System.out.println("during classification after ANOVA start");
 			JavaRDD<LabeledPoint> inp = res.map(new Function<AuthorProfile, LabeledPoint>(){
 				public LabeledPoint call(AuthorProfile prof){
-					LabeledPoint lp = new LabeledPoint(prof.author, Vectors.dense(prof.trycnt, prof.ifcnt, prof.exceptions.size()));
+					LabeledPoint lp = new LabeledPoint(prof.author, prof.getVector());
 					return lp;
 				}
 			});
@@ -130,6 +142,7 @@ public class ErrorController {
 			JavaRDD<LabeledPoint>[] splits = inp.randomSplit(new double[] {0.9, 0.1}, 11L);
 			JavaRDD<LabeledPoint> training = splits[0].cache();
 			JavaRDD<LabeledPoint> test = splits[1];
+			
 			
 			final LogisticRegressionModel model = new LogisticRegressionWithLBFGS()
 				      .setNumClasses(author_count)
@@ -148,7 +161,9 @@ public class ErrorController {
 		    // Get evaluation metrics.
 		    MulticlassMetrics metrics = new MulticlassMetrics(predictionAndLabels.rdd());
 		    double precision = metrics.precision();
+		    System.out.println("author count = " + author_count);
 		    System.out.println("Precision = " + precision);
+		    
 
 		    // Save and load model
 		    //model.save(sc, "myModelPath");

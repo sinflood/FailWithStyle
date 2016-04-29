@@ -76,34 +76,39 @@ public class FeatureExtractor {
 		}
         		//"/Users/cdarmetk/Documents/workspace/FailingWithStyle/src/main/java/failparser/TestClassBasic.java");
 
-
-		res.LoC = cu.getEndLine() - cu.getBeginLine();
+		if (cu != null){
+			res.LoC = cu.getEndLine() - cu.getBeginLine();
+		}
+		else{
+			System.out.println("CU NULL: " +res.sourceFile.getPath());
+		}
 		
         //Counter ctr = new Counter();
         // visit and print the methods names
         fv = new FeatureExtractorVisitor(res, cu);
         fv.visit(cu, null);
-        
-        System.out.println("LoC:" + (cu.getEndLine() - cu.getBeginLine()));
-        System.out.println("Error _Handling_ LoC:" + getSum(res.sizeList));
-        System.out.println("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine())));
-        System.out.println("Trys:" + res.trycnt);
-        System.out.println("Avg handling LoC Size:" + getAverage(res.sizeList));
-        System.out.println("Avg Catches:" + getAverage(res.catchesList));
+        System.out.println("-----------------------------");
+        System.out.println("LoC:" + (cu.getEndLine() - cu.getBeginLine())); //x
+        System.out.println("Error _Handling_ LoC:" + getSum(res.sizeList)); //x
+        System.out.println("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine()))); //
+        System.out.println("Trys:" + res.trycnt); //
+        System.out.println("Avg handling LoC Size:" + getAverage(res.sizeList)); //
+        System.out.println("Avg Catches:" + getAverage(res.catchesList)); //
         System.out.println("Avg Catch comments:" + getAverage(res.catchCommentSzList));
-        System.out.println("depth:" + res.depthList);
-        System.out.println("Avg depth:" + getAverage(res.depthList));
-        System.out.println("Finallys:" + res.fincnt);
-        System.out.println("rethrow:" + res.handleRethrow);
-        System.out.println("return:" + res.handleReturn);
-        System.out.println("printmsg:" + res.handlePrintMsg);
-        System.out.println("printstack:" + res.handlePrintStack);
-        System.out.println("exit:" + res.handleExit);
-        System.out.println("Doesn't Handle error:" + res.noHandling);
-        System.out.println("Ifs:" + res.ifcnt);
-        System.out.println("Throws:" + res.throwcnt);
-        System.out.println("Method Throws:" + res.methodThrows);
-        System.out.println("Exception types:" + res.exceptions.toString());
+        System.out.println("depth:" + res.depthList); //x
+        System.out.println("Avg depth:" + getAverage(res.depthList)); //x
+        System.out.println("Finallys:" + res.fincnt);//
+        System.out.println("rethrow:" + res.handleRethrow);//
+        System.out.println("return:" + res.handleReturn);//
+        System.out.println("printmsg:" + res.handlePrintMsg);//
+        System.out.println("printstack:" + res.handlePrintStack);//
+        System.out.println("exit:" + res.handleExit);//
+        System.out.println("Doesn't Handle error:" + res.noHandling);//
+        System.out.println("Ifs:" + res.ifcnt); //
+        System.out.println("Throws:" + res.throwcnt); //
+        System.out.println("Method Throws:" + res.methodThrows); //
+        System.out.println("Exception types:" + res.exceptions.toString()); //
+        System.out.println("-----------------------------");
         
         
         
@@ -205,8 +210,8 @@ public class FeatureExtractor {
         				prof.noHandling++;
         			}
         			for (Statement s : sts){
-        				System.out.println("cLine:" + s.toStringWithoutComments());
-        				System.out.println(s.getClass());
+        				//System.out.println("cLine:" + s.toStringWithoutComments());
+        				//System.out.println(s.getClass());
         				if (s instanceof ThrowStmt){
         					prof.handleRethrow++;
         				}
@@ -219,8 +224,8 @@ public class FeatureExtractor {
         					Expression exp = es.getExpression();
         					if (exp instanceof MethodCallExpr){
         						MethodCallExpr mexp = (MethodCallExpr) exp;
-            					System.out.println("mexp:" + mexp.getName());
-            					System.out.println("mexp expr:" + mexp.getNameExpr());
+            					//System.out.println("mexp:" + mexp.getName());
+            					//System.out.println("mexp expr:" + mexp.getNameExpr());
             					if (mexp.getName().equals("println")){
             						prof.handlePrintMsg++;
             					}
@@ -237,7 +242,7 @@ public class FeatureExtractor {
         			}
         		}
         		else{
-        			System.out.println("nohandling:" + c.toString());
+        			//System.out.println("nohandling:" + c.toString());
         			prof.noHandling++;
         		}
         		//System.out.println("catchblock:" + c.getCatchBlock());
