@@ -7,12 +7,17 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.FileFilterUtils;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.stat.inference.OneWayAnova;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import failparser.FeatureExtractor.FeatureExtractorVisitor;
 import scala.Tuple2;
@@ -31,12 +36,13 @@ import org.apache.spark.mllib.regression.LabeledPoint;
 import breeze.optimize.flow.LPMaxFlow;
 
 public class ErrorController {
-	static final boolean train = true;
 	static boolean doANOVA = false;
 	static boolean doClassification = true;
-	//static String dir = "/Users/cdarmetk/columbia/ASE/project/dataset_lg"
+	static Logger logger = Logger.getLogger(ErrorController.class);
 	
 	public static void main(String[] args) {
+		logger.info("--------------------------------------------");
+		logger.info("Starting Run");
 		
 		
 		//get input directory
@@ -49,15 +55,14 @@ public class ErrorController {
 	        System.err.println("First argument must be directory.");
 	        System.exit(1);
 	    }
-		//get options
+		
+		//initialize Spark
 		String appName = "Failing With Style";
 		String master = "local";
 		SparkConf conf = new SparkConf().setAppName(appName).setMaster(master);
 		JavaSparkContext sc = new JavaSparkContext(conf);
-		//JavaSparkContext jsc = new JavaSparkContext(conf);
 		
-		//FileUtils.toFile(new URL(dir))
-		
+		//Get directory object and compute # of authors
 		File dir = new File(dirPath);		
 		int author_count  = dir.listFiles(new FileFilter() {
 		    public boolean accept(File f) {
@@ -65,44 +70,46 @@ public class ErrorController {
 		    }
 		}).length;
 		
+		//Find all the Java files (recursively) in the input directory. These are the samples.
 		Collection<File> filescol = FileUtils.listFiles(dir,
                 FileFilterUtils.suffixFileFilter(".java"), TrueFileFilter.INSTANCE);
 		List<File> files = new ArrayList<File>(filescol);
+		logger.info("Total samples: " + files.size());
+		//Convert to Spark RDD
 		JavaRDD<File> samples = sc.parallelize(files);
 		
+		//Create author profiles for each sample
 		JavaRDD<AuthorProfile> res = samples.map(new Function<File, AuthorProfile>(){
 			public AuthorProfile call(File sample){
-				//extract features on dirs
+				logger.info("-----------------------------");
 				FeatureExtractor mp = new FeatureExtractor();
 				AuthorProfile res = mp.extractFeatures(sample);
 				if (res != null){
-					if (train){
-						try{
-							res.author = Integer.parseInt(res.sourceFile.getParentFile().getName());
-							System.out.println("Author:"+res.author);
-						} catch (Exception e){
-							e.printStackTrace();
-						}
+					//Get Author ID (from parent directory name)
+					try{	
+						res.author = Integer.parseInt(res.sourceFile.getParentFile().getName());
+					} catch (Exception e){
+						e.printStackTrace();
 					}
 					res.calcFeatureMap();
 				}
+				logger.info("-----------------------------");
 				return res;
 			}
 		});
 		
 		List<AuthorProfile> profList = res.collect();
 
-		System.out.println("before ANOVA start");
-		//run training/classification
+		//Run Analysis of Variance
 		if (doANOVA){
-			//for each category
+			//What categories to analyze
 			String[] categories = {"try_count", "if_count", "error_loc_ratio",
 								   "avg_catches", "avg_size", "exception_types", "throw_count_ratio",
 								   "method_throw_ratio", "finally_ratio","rethrow_ratio", "return_ratio",
 								   "print_msg_ratio", "print_stack_ratio", "exit_ratio", "no_handle_ratio",
-								   "catch_comment_avg"};
+								   "catch_comment_avg", "avg_try"};
+			//String[] categories = {"if_count"};
 			for (String cat : categories){
-				System.out.println("ANOVA " + cat);
 				//create a new map, with author -> double array
 				Map<Integer,List<Double>> data = new HashMap<Integer,List<Double>>();
 				for (AuthorProfile ap : profList){
@@ -113,24 +120,33 @@ public class ErrorController {
 				}
 
 				//convert to collection of double[]
-				data.values();
-				
-				Collection<double[]> parsed = new ArrayList<double[]>();
-				
+				List<double[]> parsed = new ArrayList<double[]>();
 				for (List<Double> d : data.values()){
 					parsed.add(ArrayUtils.toPrimitive(d.toArray(new Double[d.size()])));
 				}
+				
 				//run ANOVA
 				OneWayAnova owa = new OneWayAnova();
 				double fval = owa.anovaFValue(parsed);
-				System.out.println("FVal for " + cat + ": " + fval);
+				logger.info("FVal for " + cat + ": " + fval);
 				double pval = owa.anovaPValue(parsed);
-				System.out.println("PVal for " + cat + ": " + pval);
+				logger.info("PVal for " + cat + ": " + pval);
+				//compute mean and variance for each author
+				/*for (int i = 0; i<parsed.size(); i++){
+					double[] auth = parsed.get(i);
+					Mean m = new Mean();
+					double avg = m.evaluate(auth);
+					Variance v = new Variance();
+					double var = v.evaluate(auth, avg);
+					//System.out.println(i + ", " + avg + ", " + var);
+					System.out.println(var);
+				}*/
 			}
 		}
-		System.out.println(1.0/0);
+		
+		//run training/classification
 		if (doClassification){
-			System.out.println("during classification after ANOVA start");
+			// convert to LabelledPoint RDD for LogisticRegression
 			JavaRDD<LabeledPoint> inp = res.map(new Function<AuthorProfile, LabeledPoint>(){
 				public LabeledPoint call(AuthorProfile prof){
 					LabeledPoint lp = new LabeledPoint(prof.author, prof.getVector());
@@ -138,12 +154,15 @@ public class ErrorController {
 				}
 			});
 			
+			// Adapted from Spark tutorial:
+			// http://spark.apache.org/docs/latest/mllib-linear-methods.html#logistic-regression
+			
 			// Split initial RDD into two... [90% training data, 10% testing data].
 			JavaRDD<LabeledPoint>[] splits = inp.randomSplit(new double[] {0.9, 0.1}, 11L);
 			JavaRDD<LabeledPoint> training = splits[0].cache();
 			JavaRDD<LabeledPoint> test = splits[1];
 			
-			
+			// Train the model
 			final LogisticRegressionModel model = new LogisticRegressionWithLBFGS()
 				      .setNumClasses(author_count)
 				      .run(training.rdd());
@@ -161,19 +180,14 @@ public class ErrorController {
 		    // Get evaluation metrics.
 		    MulticlassMetrics metrics = new MulticlassMetrics(predictionAndLabels.rdd());
 		    double precision = metrics.precision();
-		    System.out.println("author count = " + author_count);
-		    System.out.println("Precision = " + precision);
-		    
-
-		    // Save and load model
-		    //model.save(sc, "myModelPath");
-		    //LogisticRegressionModel sameModel = LogisticRegressionModel.load(sc, "myModelPath");
-			
+		    logger.info("author count = " + author_count);
+		    logger.info("Precision = " + precision);
+		    logger.info("Recall = " + metrics.recall());			
 			
 			
 		}
 		sc.close();
-		//output results
+		logger.info("--------------------------------------------");
 	}
 
 }

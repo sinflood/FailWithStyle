@@ -25,6 +25,7 @@ public class AuthorProfile implements Serializable {
 	 List<Integer> catchesList = new ArrayList<Integer>();
 	 List<Integer> catchCommentSzList = new ArrayList<Integer>();
 	 List<Integer> sizeList = new ArrayList<Integer>();
+	 List<Integer> tryList = new ArrayList<Integer>();
 	 List<Integer> depthList = new ArrayList<Integer>();
 	 int noHandling = 0;
 	 int handleRethrow = 0;
@@ -76,10 +77,7 @@ public class AuthorProfile implements Serializable {
 				 getAvgCatches(), getAvgHandlingSize(), getRatio(noHandling, trycnt),
 				 ((double)methodThrows)/LoC, getRatio(handleRethrow, trycnt),
 				  getRatio(handlePrintMsg, trycnt), getRatio(handlePrintStack, trycnt),
-				 getRatio(handleExit, trycnt), getAverage(catchCommentSzList));
-		//getRatio(handleReturn, trycnt), ((double)throwcnt)/LoC
-		System.out.println(sourceFile.getPath());
-		System.out.println(v.toString());
+				 getRatio(handleExit, trycnt), getAverage(catchCommentSzList), getAverage(tryList));
 		return v;
 	 }
 	 
@@ -108,6 +106,7 @@ public class AuthorProfile implements Serializable {
 		 featureMap.put("error_loc_ratio", getErrorLoCRatio());
 		 featureMap.put("avg_catches", getAvgCatches());
 		 featureMap.put("avg_size", getAvgHandlingSize());
+		 featureMap.put("avg_try", getAverage(tryList));
 		 featureMap.put("throw_count_ratio", ((double)throwcnt)/LoC);
 		 featureMap.put("method_throw_ratio", ((double)methodThrows)/LoC);
 		 featureMap.put("finally_ratio", if_exists(fincnt));
@@ -118,7 +117,6 @@ public class AuthorProfile implements Serializable {
 		 featureMap.put("exit_ratio", getRatio(handleExit, trycnt));
 		 featureMap.put("no_handle_ratio", getRatio(noHandling, trycnt));
 		 featureMap.put("catch_comment_avg", getAverage(catchCommentSzList));
-		 
 	 }
 	
 }

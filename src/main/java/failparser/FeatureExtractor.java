@@ -9,6 +9,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseException;
 import com.github.javaparser.ast.CompilationUnit;
@@ -36,6 +39,8 @@ public class FeatureExtractor {
 	
 	public FeatureExtractorVisitor fv;
 	
+	static Logger logger = Logger.getLogger(FeatureExtractor.class);
+	
 	public static double getAverage(List<Integer> vals){
 		return getSum(vals)/vals.size();
 	}
@@ -55,63 +60,46 @@ public class FeatureExtractor {
         CompilationUnit cu = null;
 		try {
 			in = new FileInputStream(featureFile);
-
-	        try {
-	            // parse the file
-	            cu = JavaParser.parse(in);
-	        } catch (ParseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} finally {
-	            try {
-					in.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-	        }
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
+			
+            // parse the file
+	        cu = JavaParser.parse(in);
+			in.close();
+	        
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
-        		//"/Users/cdarmetk/Documents/workspace/FailingWithStyle/src/main/java/failparser/TestClassBasic.java");
-
+		
 		if (cu != null){
+			//record total LoC
 			res.LoC = cu.getEndLine() - cu.getBeginLine();
 		}
 		else{
-			System.out.println("CU NULL: " +res.sourceFile.getPath());
+			logger.warn("CU is NULL: " + res.sourceFile.getPath());
 		}
 		
-        //Counter ctr = new Counter();
-        // visit and print the methods names
         fv = new FeatureExtractorVisitor(res, cu);
         fv.visit(cu, null);
-        System.out.println("-----------------------------");
-        System.out.println("LoC:" + (cu.getEndLine() - cu.getBeginLine())); //x
-        System.out.println("Error _Handling_ LoC:" + getSum(res.sizeList)); //x
-        System.out.println("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine()))); //
-        System.out.println("Trys:" + res.trycnt); //
-        System.out.println("Avg handling LoC Size:" + getAverage(res.sizeList)); //
-        System.out.println("Avg Catches:" + getAverage(res.catchesList)); //
-        System.out.println("Avg Catch comments:" + getAverage(res.catchCommentSzList));
-        System.out.println("depth:" + res.depthList); //x
-        System.out.println("Avg depth:" + getAverage(res.depthList)); //x
-        System.out.println("Finallys:" + res.fincnt);//
-        System.out.println("rethrow:" + res.handleRethrow);//
-        System.out.println("return:" + res.handleReturn);//
-        System.out.println("printmsg:" + res.handlePrintMsg);//
-        System.out.println("printstack:" + res.handlePrintStack);//
-        System.out.println("exit:" + res.handleExit);//
-        System.out.println("Doesn't Handle error:" + res.noHandling);//
-        System.out.println("Ifs:" + res.ifcnt); //
-        System.out.println("Throws:" + res.throwcnt); //
-        System.out.println("Method Throws:" + res.methodThrows); //
-        System.out.println("Exception types:" + res.exceptions.toString()); //
-        System.out.println("-----------------------------");
-        
-        
-        
+        /*logger.info("LoC:" + (cu.getEndLine() - cu.getBeginLine())); //x
+        logger.info("Error _Handling_ LoC:" + getSum(res.sizeList)); //x
+        logger.info("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine()))); //*/
+        logger.info("Trys:" + res.trycnt); //
+        /*logger.info("Avg handling LoC Size:" + getAverage(res.sizeList)); //
+        logger.info("Avg Catches:" + getAverage(res.catchesList)); //
+        logger.info("Avg Catch comments:" + getAverage(res.catchCommentSzList));
+        logger.info("depth:" + res.depthList); //x
+        logger.info("Avg depth:" + getAverage(res.depthList)); //x
+        logger.info("Finallys:" + res.fincnt);//
+        logger.info("rethrow:" + res.handleRethrow);//
+        logger.info("return:" + res.handleReturn);//
+        logger.info("printmsg:" + res.handlePrintMsg);//
+        logger.info("printstack:" + res.handlePrintStack);//
+        logger.info("exit:" + res.handleExit);//
+        logger.info("Doesn't Handle error:" + res.noHandling);//
+        logger.info("Ifs:" + res.ifcnt); //
+        logger.info("Throws:" + res.throwcnt); //
+        logger.info("Method Throws:" + res.methodThrows); //
+        logger.info("Exception types:" + res.exceptions.toString()); //*/    
+
         return res;
 	}
 	
@@ -173,36 +161,28 @@ public class FeatureExtractor {
 		
         @Override
         public void visit(TryStmt n, Object arg) {
-            // here you can access the attributes of the method.
-            // this method will be called for all methods in this 
-            // CompilationUnit, including inner class methods
         	prof.trycnt++;
         	Node parent = n.getParentNode();
         	int depth = 0;
         	while (parent != null){
-        		//System.out.println("parent:" + parent.getClass());
-        		//if (parent.getClass() != CompilationUnit){
         	    depth++;
-        		//}
         		parent = parent.getParentNode();
         	}
         	prof.depthList.add(depth);
-        	//System.out.println("Line:" + n.toStringWithoutComments());
         	int catches = n.getCatchs().size();
         	prof.catchesList.add(catches);
+        	BlockStmt tryblock = n.getTryBlock();
+        	if (tryblock != null){
+        		prof.tryList.add(tryblock.getEndLine() -tryblock.getBeginLine());
+        	}
         	for (CatchClause c : n.getCatchs()){
         		c.getAllContainedComments().size();
         		prof.catchCommentSzList.add(c.getAllContainedComments().size());
-        		/*System.out.println("catchblock len:" + (c.getEndLine() - c.getBeginLine()));
-        		System.out.println("except:" + c.getExcept());
-        		System.out.println("exceptcl:" + c.getExcept().getClass());*/
         		MultiTypeParameter e = c.getExcept();
-        		/*System.out.println("id:" + e.getId());
-        		System.out.println("mod:" + e.getModifiers());
-        		System.out.println("type:" + e.getTypes());*/
         		for (Type t : e.getTypes()){
         			prof.exceptions.add(t.toStringWithoutComments());
         		}
+        		
         		prof.sizeList.add(c.getCatchBlock().getEndLine() - c.getCatchBlock().getBeginLine());
         		List<Statement> sts = c.getCatchBlock().getStmts();
         		if (sts != null){
@@ -210,8 +190,6 @@ public class FeatureExtractor {
         				prof.noHandling++;
         			}
         			for (Statement s : sts){
-        				//System.out.println("cLine:" + s.toStringWithoutComments());
-        				//System.out.println(s.getClass());
         				if (s instanceof ThrowStmt){
         					prof.handleRethrow++;
         				}
@@ -219,13 +197,10 @@ public class FeatureExtractor {
         					prof.handleReturn++;
         				}
         				else if (s instanceof ExpressionStmt){
-        					//system.exit, printStackTrace, system.out.print
         					ExpressionStmt es = (ExpressionStmt)s;
         					Expression exp = es.getExpression();
         					if (exp instanceof MethodCallExpr){
         						MethodCallExpr mexp = (MethodCallExpr) exp;
-            					//System.out.println("mexp:" + mexp.getName());
-            					//System.out.println("mexp expr:" + mexp.getNameExpr());
             					if (mexp.getName().equals("println")){
             						prof.handlePrintMsg++;
             					}
@@ -242,36 +217,14 @@ public class FeatureExtractor {
         			}
         		}
         		else{
-        			//System.out.println("nohandling:" + c.toString());
         			prof.noHandling++;
         		}
-        		//System.out.println("catchblock:" + c.getCatchBlock());
-        		//System.out.println("catchblockcl:" + c.getCatchBlock().getClass());
         	}
-        	
-        	
-        	
-
         	
         	BlockStmt fin = n.getFinallyBlock();
         	if (fin != null){
-        		//System.out.println("Fin:" + fin.toStringWithoutComments());
         		prof.fincnt++;
         	}
-        	/*
-        	n.getChildrenNodes();
-        	n.getThrows();
-            System.out.println(n.getName());
-            BlockStmt body = n.getBody();
-            for (Statement s : body.getStmts()){
-            	if (s instanceof TryStmt){
-            		
-            	}
-            	System.out.println("Line:" + s.toStringWithoutComments());
-            	System.out.println("Type:" + s.getClass().toString());
-            	
-            }*/
-            //System.out.println(n.getBody());
             super.visit(n, arg);
         }
         @Override
@@ -281,11 +234,7 @@ public class FeatureExtractor {
         	Expression cond = n.getCondition();
         	Statement th = n.getThenStmt();
         	Statement el = n.getElseStmt();
-        	
-        	/*System.out.println("Line:" + n.toStringWithoutComments());
-        	System.out.println("if class:" + cond.getClass());
-        	System.out.println("else:" + el.toString());
-        	System.out.println("then:" + th.toString());*/
+
         	if (cond instanceof BinaryExpr){
         		BinaryExpr bcond = (BinaryExpr) cond;
         		if (bcond.getRight() instanceof NullLiteralExpr || bcond.getLeft() instanceof NullLiteralExpr){
@@ -315,25 +264,16 @@ public class FeatureExtractor {
         @Override
         public void visit(ThrowStmt n, Object arg) {
         	prof.throwcnt++;
-        	//System.out.println("Line:" + n.toStringWithoutComments());
         	Expression exp = n.getExpr();
         	if (exp instanceof ObjectCreationExpr){
         		ObjectCreationExpr o = (ObjectCreationExpr) exp;
         		prof.exceptions.add(o.getType().toStringWithoutComments());
-        		/*System.out.println("args:" + o.getArgs());
-        		System.out.println("type:" + o.getType());
-        		System.out.println("scope:" + o.getScope());
-        		System.out.println("type args:" + o.getTypeArgs());*/
         	}
-        	//System.out.println("class:" + n.getExpr().getClass());
             super.visit(n, arg);
         }
         
         @Override
         public void visit(MethodDeclaration n, Object arg) {
-            // here you can access the attributes of the method.
-            // this method will be called for all methods in this 
-            // CompilationUnit, including inner class methods
             List<NameExpr> thr = n.getThrows();
             if (thr != null && thr.size() > 0){
             	prof.methodThrows++;
@@ -341,36 +281,7 @@ public class FeatureExtractor {
             for (NameExpr ex : thr){
             	prof.exceptions.add(ex.getName());
             }
-            //System.out.println(n.getBody());
             super.visit(n, arg);
         }
     }
-        
-        /**
-         * Simple visitor implementation for visiting MethodDeclaration nodes. 
-         */
-        @SuppressWarnings("rawtypes")
-    	private static class MethodVisitor extends VoidVisitorAdapter {
-
-            @Override
-            public void visit(MethodDeclaration n, Object arg) {
-                // here you can access the attributes of the method.
-                // this method will be called for all methods in this 
-                // CompilationUnit, including inner class methods
-            	n.getChildrenNodes();
-            	n.getThrows();
-                //System.out.println(n.getName());
-                BlockStmt body = n.getBody();
-                for (Statement s : body.getStmts()){
-                	if (s instanceof TryStmt){
-                		
-                	}
-                	//System.out.println("Line:" + s.toStringWithoutComments());
-                	//System.out.println("Type:" + s.getClass().toString());
-                	
-                }
-                //System.out.println(n.getBody());
-                super.visit(n, arg);
-            }
-       }
 }
