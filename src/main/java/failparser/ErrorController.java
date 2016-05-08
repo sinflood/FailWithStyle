@@ -44,7 +44,6 @@ public class ErrorController {
 		logger.info("--------------------------------------------");
 		logger.info("Starting Run");
 		
-		
 		//get input directory
 		String dirPath = null;
 		

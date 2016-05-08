@@ -44,21 +44,21 @@ public class AuthorProfile implements Serializable {
 	 
 	 int LoC = 0;
 	 
-		public static double getAverage(List<Integer> vals){
-			if (vals.size() == 0){
-				return 0.0;
-			}
-			else{
-				return getSum(vals)/vals.size();
-			}
+	public static double getAverage(List<Integer> vals){
+		if (vals.size() == 0){
+			return 0.0;
 		}
-		public static double getSum(List<Integer> vals){
-			double tot = 0.0;
-			for (int i : vals){
-				tot += i;
-			}
-			return tot;
+		else{
+			return getSum(vals)/vals.size();
 		}
+	}
+	public static double getSum(List<Integer> vals){
+		double tot = 0.0;
+		for (int i : vals){
+			tot += i;
+		}
+		return tot;
+	}
 		
 	 public double getAvgCatches(){
 		 return getAverage(this.catchesList);

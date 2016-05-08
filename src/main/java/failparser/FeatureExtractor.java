@@ -52,6 +52,12 @@ public class FeatureExtractor {
 		return tot;
 	}
 	
+	/**
+	 * Parses and analyzes a file and returns an AuthorProfile.
+	 * 
+	 * @param featureFile the input file
+	 * @return A AuthorProfile object with relevant features.
+	 */
 	public AuthorProfile extractFeatures(File featureFile){
 		// creates an input stream for the file to be parsed
 		AuthorProfile res = new AuthorProfile();
@@ -70,20 +76,21 @@ public class FeatureExtractor {
 		}
 		
 		if (cu != null){
-			//record total LoC
+			// record total LoC
 			res.LoC = cu.getEndLine() - cu.getBeginLine();
 		}
 		else{
 			logger.warn("CU is NULL: " + res.sourceFile.getPath());
 		}
 		
+        // Traverse tree and calculate metrics
         fv = new FeatureExtractorVisitor(res, cu);
         fv.visit(cu, null);
-        /*logger.info("LoC:" + (cu.getEndLine() - cu.getBeginLine())); //x
+        logger.info("LoC:" + (cu.getEndLine() - cu.getBeginLine())); //x
         logger.info("Error _Handling_ LoC:" + getSum(res.sizeList)); //x
-        logger.info("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine()))); //*/
+        logger.info("Error handling to LoC ratio:" + (getSum(res.sizeList)/(cu.getEndLine() - cu.getBeginLine()))); //
         logger.info("Trys:" + res.trycnt); //
-        /*logger.info("Avg handling LoC Size:" + getAverage(res.sizeList)); //
+        logger.info("Avg handling LoC Size:" + getAverage(res.sizeList)); //
         logger.info("Avg Catches:" + getAverage(res.catchesList)); //
         logger.info("Avg Catch comments:" + getAverage(res.catchCommentSzList));
         logger.info("depth:" + res.depthList); //x
@@ -98,7 +105,7 @@ public class FeatureExtractor {
         logger.info("Ifs:" + res.ifcnt); //
         logger.info("Throws:" + res.throwcnt); //
         logger.info("Method Throws:" + res.methodThrows); //
-        logger.info("Exception types:" + res.exceptions.toString()); //*/    
+        logger.info("Exception types:" + res.exceptions.toString()); //  
 
         return res;
 	}
@@ -115,12 +122,11 @@ public class FeatureExtractor {
         } finally {
             in.close();
         }
-
-        //Counter ctr = new Counter();
-        // visit and print the methods names
         AuthorProfile prof = new AuthorProfile();
         
         prof.LoC = cu.getEndLine() - cu.getBeginLine();
+        
+        // Traverse tree and calculate metrics
         FeatureExtractorVisitor tr = new FeatureExtractorVisitor(prof, cu);
         tr.visit(cu, null);
         System.out.println("LoC:" + (cu.getEndLine() - cu.getBeginLine()));
@@ -148,8 +154,6 @@ public class FeatureExtractor {
 
     @SuppressWarnings("rawtypes")
 	public static class FeatureExtractorVisitor extends VoidVisitorAdapter {
-
-		
 		AuthorProfile prof;
 		CompilationUnit cu;
 		
@@ -158,10 +162,12 @@ public class FeatureExtractor {
 			cu = c;
 		}
 
-		
         @Override
         public void visit(TryStmt n, Object arg) {
+        	// Examine Try Statement
         	prof.trycnt++;
+        	
+        	//Calculate the depth
         	Node parent = n.getParentNode();
         	int depth = 0;
         	while (parent != null){
@@ -169,8 +175,10 @@ public class FeatureExtractor {
         		parent = parent.getParentNode();
         	}
         	prof.depthList.add(depth);
+        	//Calculate # of catches
         	int catches = n.getCatchs().size();
         	prof.catchesList.add(catches);
+        	// Get length of Try block
         	BlockStmt tryblock = n.getTryBlock();
         	if (tryblock != null){
         		prof.tryList.add(tryblock.getEndLine() -tryblock.getBeginLine());
@@ -185,6 +193,7 @@ public class FeatureExtractor {
         		
         		prof.sizeList.add(c.getCatchBlock().getEndLine() - c.getCatchBlock().getBeginLine());
         		List<Statement> sts = c.getCatchBlock().getStmts();
+        		// Determine any handling style
         		if (sts != null){
         			if (sts.size() == 0){
         				prof.noHandling++;
@@ -220,7 +229,6 @@ public class FeatureExtractor {
         			prof.noHandling++;
         		}
         	}
-        	
         	BlockStmt fin = n.getFinallyBlock();
         	if (fin != null){
         		prof.fincnt++;
@@ -229,15 +237,12 @@ public class FeatureExtractor {
         }
         @Override
         public void visit(IfStmt n, Object arg) {
-
-        	
+        	// Examine if statement
         	Expression cond = n.getCondition();
-        	Statement th = n.getThenStmt();
-        	Statement el = n.getElseStmt();
-
         	if (cond instanceof BinaryExpr){
         		BinaryExpr bcond = (BinaryExpr) cond;
         		if (bcond.getRight() instanceof NullLiteralExpr || bcond.getLeft() instanceof NullLiteralExpr){
+        			//This is an If-null statement.
         			prof.ifcnt++;
         			if (bcond.getOperator() == BinaryExpr.Operator.notEquals){
         				// means 'else' section is error handling
@@ -248,8 +253,6 @@ public class FeatureExtractor {
         					prof.sizeList.add(0);
         					//TODO also add this to error handling style for not handled
         				}
-        				
-        				
         			}
         			else if(bcond.getOperator() == BinaryExpr.Operator.equals){
         				//means 'then' section is error handling
@@ -257,12 +260,11 @@ public class FeatureExtractor {
         			}
         		}
         	}
-        	
-        	
             super.visit(n, arg);
         }
         @Override
         public void visit(ThrowStmt n, Object arg) {
+        	// Record the amount of throw statments and the types of exceptions used.
         	prof.throwcnt++;
         	Expression exp = n.getExpr();
         	if (exp instanceof ObjectCreationExpr){
@@ -274,6 +276,7 @@ public class FeatureExtractor {
         
         @Override
         public void visit(MethodDeclaration n, Object arg) {
+        	// Record if any method declarations declare a thrown exception
             List<NameExpr> thr = n.getThrows();
             if (thr != null && thr.size() > 0){
             	prof.methodThrows++;
