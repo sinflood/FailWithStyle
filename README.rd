@@ -1,4 +1,4 @@
-This is a tool for analyzing the error handling style of Java code for author-related style traits. Check out the full report (path here) for more information.
+This is a tool for analyzing the error handling style of Java code for author-related style traits. Check out the full report (final_report.pdf) for more information.
 
 To build:
 Build the dependencies with Maven (eclipse or command line)
