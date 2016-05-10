@@ -3,7 +3,12 @@ package failparser;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
+/**
+ * This is a class that can be used for testing the basic functionality of the system.
+ * It includes multiple error handling styles to exercise different feature computations.
+ **/
 public class TestClassBasic {
+
 
 	public static String changeString(String input) throws FileNotFoundException{
 		try {
